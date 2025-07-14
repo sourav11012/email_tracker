@@ -66,7 +66,7 @@ def track(open_id):
         first_ts = None if row["first_ts"] is None else datetime.fromisoformat(row["first_ts"])
 
     # Log this hit (always)
-    log_open_only(open_id, email, ua)
+    log_open(open_id, email, ua)
 
     # Decide whether to notify
     should_notify = False
@@ -82,7 +82,7 @@ def track(open_id):
         except Exception as e:
             print("Slack error:", e)
 
-    return send_file(IMAGE_PATH, mimetype="image/jpeg")
+    return send_file(IMAGE_PATH, mimetype="image/png")
 
 @app.route("/health")
 def health():
