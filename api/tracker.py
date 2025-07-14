@@ -5,6 +5,7 @@ import os
 import tempfile
 from slack_sdk.webhook import WebhookClient
 from dotenv import load_dotenv
+from datetime import datetime, timedelta, timezone
 
 load_dotenv()
 
@@ -47,30 +48,41 @@ def log_open(open_id, email, ua):
         except Exception as e:
             print("Slack error:", e)
 
+GRACE_SEC = 5
 
 @app.route("/t/<open_id>.png")
 def track(open_id):
-    """Log every request, but Slack-ping only from the 2nd hit onward."""
     email = request.args.get("e", "unknown")
     ua    = request.headers.get("User-Agent", "")
 
-    # --- check if we've seen this open_id before
+    now = datetime.now(timezone.utc)
+
+    # Fetch earliest timestamp for this open_id
     with get_db() as db:
-        seen_before = db.execute(
-            "SELECT 1 FROM opens WHERE open_id = ? LIMIT 1", (open_id,)
+        row = db.execute(
+            "SELECT MIN(ts) AS first_ts FROM opens WHERE open_id = ?",
+            (open_id,)
         ).fetchone()
+        first_ts = None if row["first_ts"] is None else datetime.fromisoformat(row["first_ts"])
 
-    # --- always log the hit
-    log_open(open_id, email, ua)
+    # Log this hit (always)
+    log_open_only(open_id, email, ua)
 
-    # --- only notify Slack if it's NOT the first time
-    if seen_before and slack:
+    # Decide whether to notify
+    should_notify = False
+    if first_ts is not None:
+        # Not the very first hit
+        if now - first_ts > timedelta(seconds=GRACE_SEC):
+            should_notify = True
+    # else: first_hit ⇒ no notify
+
+    if should_notify and slack:
         try:
-            slack.send(text=f"📬 {email} opened again (id={open_id})")
+            slack.send(text=f"📬 {email} opened (id={open_id})")
         except Exception as e:
             print("Slack error:", e)
 
-    return send_file(IMAGE_PATH, mimetype="image/png")
+    return send_file(IMAGE_PATH, mimetype="image/jpeg")
 
 @app.route("/health")
 def health():
