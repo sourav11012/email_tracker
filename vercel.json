@@ -1,0 +1,12 @@
+{
+  "routes": [
+    {
+      "src": "/t/(.*).jpeg",
+      "dest": "/api/tracker.py"
+    },
+    {
+      "src": "/health",
+      "dest": "/api/tracker.py"
+    }
+  ]
+}
